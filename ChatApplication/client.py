@@ -181,6 +181,31 @@ def authorize():
         current_state = "authorized"
     pass
 
+
+def send_public_message():
+    command = "msg"
+    message = input("Message: ")
+    send_command(command, message)
+    response = get_servers_response()
+    if "msgok" in response:
+        print("You: ", message)
+    else:
+        print(response)
+    pass
+
+
+def send_private_message():
+    command = "privmsg"
+    username = input("To: ")
+    message = username + " " + input("Message: ")
+    send_command(command, message)
+    response = get_servers_response()
+    if "msgok" in response:
+        print("You to ",username, ": ", message)
+    else:
+        print(response)
+    pass
+
 """
 The list of available actions that the user can perform
 Each action is a dictionary with the following fields:
@@ -208,20 +233,18 @@ available_actions = [
     {
         "description": "Send a public message",
         "valid_states": ["connected", "authorized"],
-        # TODO Step 6 - implement sending a public message
         # Hint: ask the user to input the message from the keyboard
         # Hint: you can reuse the send_command() function to send the "msg" command
         # Hint: remember to read the server's response: whether the message was successfully sent or not
-        "function": None
+        "function": send_public_message
     },
     {
         "description": "Send a private message",
         "valid_states": ["authorized"],
-        # TODO Step 8 - implement sending a private message
         # Hint: ask the user to input the recipient and message from the keyboard
         # Hint: you can reuse the send_command() function to send the "privmsg" command
         # Hint: remember to read the server's response: whether the message was successfully sent or not
-        "function": None
+        "function": send_private_message
     },
     {
         "description": "Read messages in the inbox",
