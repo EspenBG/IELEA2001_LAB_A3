@@ -15,6 +15,7 @@ states = [
 ]
 TCP_PORT = 1300  # TCP port used for communication
 SERVER_HOST = "datakomm.work"  # Set this to either hostname (domain) or IP address of the chat server
+SYNC_MODE = True   # Set this yo true to use synchronous mode
 
 # --------------------
 # State variables
@@ -50,7 +51,9 @@ def send_command(command, arguments):
     # TODO FINAL: Add comments to this function?
     message_to_send = command
     if arguments is not None:
+        message_to_send += " "
         message_to_send += arguments
+
     message_to_send += '\n'
     message_encoded = message_to_send.encode()
     client_socket.send(message_encoded)
@@ -104,27 +107,28 @@ def connect_to_server():
         client_socket.connect((SERVER_HOST, TCP_PORT))
         connection_established = True
 
-    except IOError as error:
-        print('ERROR Connecting to server: ', error)
+    except IOError as e:
+        print('ERROR Connecting to server: ', e)
         connection_established = False
 
     if connection_established:
-        current_state = states[1]
+        current_state = "connected"
+        if SYNC_MODE:   # The Server is running async by default
+            send_command('sync', None)
+            response = get_servers_response()
+            if response != "modeok":
+                print("ERROR: mode not switched")
+            else:
+                print("Running in synchronous mode")
 
     # Hint: send the sync command according to the protocol
     # Hint: create function send_command(command, arguments) which you will use to send this and all other commands
     # to the server
-    send_command('sync', None)
 
-    # TODO FINAL: Refactor and clean up
     # Hint: implement the get_servers_response function first - it should wait for one response command from the server
     # and return the server's response (we expect "modeok" response here). This get_servers_response() function
     # will come in handy later as well - when we will want to check the server's response to login, messages etc
-    response = get_servers_response()
-    if response != "modeok":
-        print("ERROR: mode not switched")
-    else:
-        print("Running in synchronous mode")
+
     # print("CONNECTION NOT IMPLEMENTED!")
 
 
@@ -151,7 +155,7 @@ def disconnect_from_server():
         client_closed = True
 
     if client_closed:
-        current_state = states[0]
+        current_state = "disconnected"
     pass
 
 
@@ -166,9 +170,15 @@ def authorize():
     # Hint: you probably want to change the state of the system: update value of current_state variable
     # Hint: remember to tell the function that you will want to use the global variable "current_state".
     # Hint: if the login was unsuccessful (loginerr returned), show the error message to the user
+    global current_state
     username = input('Enter username: ')
     command = "login"
     send_command(command, username)
+    response = get_servers_response()
+    if "loginerr" in response:
+        print(response)
+    else:
+        current_state = "authorized"
     pass
 
 """
