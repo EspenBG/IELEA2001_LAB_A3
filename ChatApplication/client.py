@@ -160,7 +160,6 @@ def disconnect_from_server():
 
 
 def authorize():
-    # TODO Step 5 - implement login
     # Hint: you will probably want to create a new function (call it login(), or authorize()) and
     # reference that function here.
     # Hint: you can ask the user to enter the username with input("Enter username: ") function.
@@ -219,6 +218,32 @@ def get_users():
     pass
 
 
+def get_inbox():
+    send_command("inbox", None)
+    first_line = get_servers_response().split()
+    if "inbox" in first_line:
+
+        for i in range(int(first_line[1])):
+            message_type, username, message = get_servers_response().split(maxsplit=2)
+            #username = username.strip()
+
+            if message_type == "privmsg":
+                print(username, "to you:", message)
+            else:
+                print(username, "to all:", message)
+    pass
+
+
+def get_joke():
+    # TODO: Create this feature and implement it (Get a Joke)
+    send_command("joke", None)
+    command, joke = get_servers_response().split(maxsplit=1)
+
+    if command == "joke":
+        print(joke)
+    pass
+
+
 """
 The list of available actions that the user can perform
 Each action is a dictionary with the following fields:
@@ -266,12 +291,11 @@ available_actions = [
         # Hint: send the inbox command, find out how many messages there are. Then parse messages
         # one by one: find if it is a private or public message, who is the sender. Print this
         # information in a user friendly way
-        "function": None
+        "function": get_inbox
     },
     {
         "description": "See list of users",
         "valid_states": ["connected", "authorized"],
-        # TODO Step 7 - Implement getting the list of currently connected users
         # Hint: use the provided chat client tools and analyze traffic with Wireshark to find out how
         # the user list is reported. Then implement a function which gets the user list from the server
         # and prints the list of usernames
@@ -283,7 +307,7 @@ available_actions = [
         # TODO - optional step - implement the joke fetching from the server.
         # Hint: this part is not described in the protocol. But the command is simple. Try to find
         # out how it works ;)
-        "function": None
+        "function": get_joke
     },
     {
         "description": "Quit the application",
