@@ -9,7 +9,7 @@ from socket import *
 HOST = "datakomm.work"
 PORT = 1301
 
-# The socket object (connection to the server and data excahgne will happen using this variable)
+# The socket object (connection to the server and data exchange will happen using this variable)
 client_socket = None
 
 
@@ -44,7 +44,6 @@ def connect_to_server(host, port):
     #     what_to_do_in_case_of_error()
 
 
-
 def close_connection():
     """
     Close the TCP connection to the remote server.
@@ -52,10 +51,12 @@ def close_connection():
     """
     # The "global" keyword is needed so that this function refers to the globally defined client_socket variable
     global client_socket
-
-    client_socket.close()
+    try:
+        client_socket.close()
+        return True
+    except socket.error:
+        return False
     # TODO - implement this method
-    return False
 
 
 def send_request_to_server(request):
@@ -66,17 +67,14 @@ def send_request_to_server(request):
     # The "global" keyword is needed so that this function refers to the globally defined client_socket variable
     global client_socket
     send_success = False
-
+    message_to_send = request + "\n"
     try:
-        client_socket.send(request.encode())
+        client_socket.send(message_to_send.encode())
         send_success = True
     except IOError:
         send_success = False
-        print('ERROR')
     finally:
         return send_success
-    # TODO - implement this method
-
 
 
 def read_response_from_server():
@@ -87,9 +85,14 @@ def read_response_from_server():
     """
     # The "global" keyword is needed so that this function refers to the globally defined client_socket variable
     global client_socket
-    server_message = client_socket.recv()
-
-    return None
+    first_message = None
+    try:
+        server_response = client_socket.recv(100).decode()
+        message_array = server_response.splitlines()
+        first_message = message_array[0]
+        return first_message
+    except IOError:
+        return first_message
 
 
 def run_client_tests():
@@ -117,7 +120,7 @@ def run_client_tests():
     print("Server responded with: ", response)
     seconds_to_sleep = 2 + random.randint(0, 5)
     print("Sleeping %i seconds to allow simulate long client-server connection..." % seconds_to_sleep)
-    time.sleep(seconds_to_sleep * 1000)
+    time.sleep(seconds_to_sleep)
 
     request = "bla+bla"
     if not send_request_to_server(request):
