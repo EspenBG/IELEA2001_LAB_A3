@@ -4,7 +4,6 @@
 
 from socket import *
 
-
 # --------------------
 # Constants
 # --------------------
@@ -15,7 +14,7 @@ states = [
     "authorized"  # Connected and authorized (logged in)
 ]
 TCP_PORT = 1300  # TCP port used for communication
-SERVER_HOST = "localhost"  # Set this to either hostname (domain) or IP address of the chat server
+SERVER_HOST = "datakomm.work"  # Set this to either hostname (domain) or IP address of the chat server
 
 # --------------------
 # State variables
@@ -25,7 +24,7 @@ current_state = "disconnected"  # The current state of the system
 must_run = True
 # Use this variable to create socket connection to the chat server
 # Note: the "type: socket" is a hint to PyCharm about the type of values we will assign to the variable
-client_socket = socket(AF_INET, SOCK_STREAM)  # type: socket
+client_socket = None  # type: socket
 
 
 def quit_application():
@@ -45,9 +44,16 @@ def send_command(command, arguments):
     :return:
     """
     global client_socket
-    # TODO: Implement this (part of step 3)
     # Hint: concatenate the command and the arguments
     # Hint: remember to send the newline at the end
+
+    # TODO FINAL: Add comments to this function?
+    message_to_send = command
+    if arguments is not None:
+        message_to_send += arguments
+    message_to_send += '\n'
+    message_encoded = message_to_send.encode()
+    client_socket.send(message_encoded)
     pass
 
 
@@ -75,40 +81,95 @@ def get_servers_response():
     Wait until a response command is received from the server
     :return: The response of the server, the whole line as a single string
     """
-    # TODO Step 4: implement this function
+    # TODO FINAL: Clean up function and refactor code
+    global client_socket
     # Hint: reuse read_one_line (copied from the tutorial-code)
-    return None
+    message_from_server = ""
+    while message_from_server == "":
+        message_from_server = read_one_line(client_socket)
+
+    return message_from_server
 
 
 def connect_to_server():
+    # TODO FINAL: Clean up function
     # Must have these two lines, otherwise the function will not "see" the global variables that we will change here
     global client_socket
     global current_state
 
-    # TODO Step 1: implement connection establishment
     # Hint: create a socket, connect, handle exceptions, then change current_state accordingly
 
-    # TODO Step 3: switch to sync mode
+    try:
+        client_socket = socket(AF_INET, SOCK_STREAM)
+        client_socket.connect((SERVER_HOST, TCP_PORT))
+        connection_established = True
+
+    except IOError as error:
+        print('ERROR Connecting to server: ', error)
+        connection_established = False
+
+    if connection_established:
+        current_state = states[1]
+
     # Hint: send the sync command according to the protocol
     # Hint: create function send_command(command, arguments) which you will use to send this and all other commands
     # to the server
+    send_command('sync', None)
 
-    # TODO Step 4: wait for the servers response and find out whether the switch to SYNC mode was successful
+    # TODO FINAL: Refactor and clean up
     # Hint: implement the get_servers_response function first - it should wait for one response command from the server
     # and return the server's response (we expect "modeok" response here). This get_servers_response() function
     # will come in handy later as well - when we will want to check the server's response to login, messages etc
-    print("CONNECTION NOT IMPLEMENTED!")
+    response = get_servers_response()
+    if response != "modeok":
+        print("ERROR: mode not switched")
+    else:
+        print("Running in synchronous mode")
+    # print("CONNECTION NOT IMPLEMENTED!")
 
 
 def disconnect_from_server():
-    # TODO Step 2: Implement disconnect
+    # TODO FINAL: Clean up function and refactor code
     # Hint: close the socket, handle exceptions, update current_state accordingly
 
     # Must have these two lines, otherwise the function will not "see" the global variables that we will change here
     global client_socket
     global current_state
+
+    try:
+        client_socket.close()
+        client_closed = True
+
+    except IOError as e:
+        print('ERROR closing to server: ', e)
+        client_closed = False
+
+    except AttributeError as e:
+        # AttributeError is when is is not possible to use the close command, i.e. if client_socket == None
+        # this means the socket is already closed
+        print('ERROR closing to server: ', e)
+        client_closed = True
+
+    if client_closed:
+        current_state = states[0]
     pass
 
+
+def authorize():
+    # TODO Step 5 - implement login
+    # Hint: you will probably want to create a new function (call it login(), or authorize()) and
+    # reference that function here.
+    # Hint: you can ask the user to enter the username with input("Enter username: ") function.
+    # Hint: the login function must be above this line, otherwise the available_actions will complain that it can't
+    # find the function
+    # Hint: you can reuse the send_command() function to send the "login" command
+    # Hint: you probably want to change the state of the system: update value of current_state variable
+    # Hint: remember to tell the function that you will want to use the global variable "current_state".
+    # Hint: if the login was unsuccessful (loginerr returned), show the error message to the user
+    username = input('Enter username: ')
+    command = "login"
+    send_command(command, username)
+    pass
 
 """
 The list of available actions that the user can perform
@@ -132,17 +193,7 @@ available_actions = [
     {
         "description": "Authorize (log in)",
         "valid_states": ["connected", "authorized"],
-        # TODO Step 5 - implement login
-        # Hint: you will probably want to create a new function (call it login(), or authorize()) and
-        # reference that function here.
-        # Hint: you can ask the user to enter the username with input("Enter username: ") function.
-        # Hint: the login function must be above this line, otherwise the available_actions will complain that it can't
-        # find the function
-        # Hint: you can reuse the send_command() function to send the "login" command
-        # Hint: you probably want to change the state of the system: update value of current_state variable
-        # Hint: remember to tell the function that you will want to use the global variable "current_state".
-        # Hint: if the login was unsuccessful (loginerr returned), show the error message to the user
-        "function": None
+        "function": authorize
     },
     {
         "description": "Send a public message",
@@ -264,6 +315,7 @@ def perform_user_action(action_index):
         print("Invalid input, please choose a valid action")
     print()
     return None
+
 
 # Entrypoint for the application. In PyCharm you should see a green arrow on the left side.
 # By clicking it you run the application.
