@@ -25,7 +25,7 @@ current_state = "disconnected"  # The current state of the system
 must_run = True
 # Use this variable to create socket connection to the chat server
 # Note: the "type: socket" is a hint to PyCharm about the type of values we will assign to the variable
-client_socket = None  # type: socket
+client_socket = socket(AF_INET, SOCK_STREAM)  # type: socket
 
 
 def quit_application():
