@@ -206,6 +206,19 @@ def send_private_message():
         print(response)
     pass
 
+
+def get_users():
+    send_command("users", None)
+    response = get_servers_response()
+    if "users" in response:
+        all_users = response.split()
+        all_users = all_users[1:]
+        print("The following users are online: ")
+        for user in all_users:
+            print(user)
+    pass
+
+
 """
 The list of available actions that the user can perform
 Each action is a dictionary with the following fields:
@@ -262,7 +275,7 @@ available_actions = [
         # Hint: use the provided chat client tools and analyze traffic with Wireshark to find out how
         # the user list is reported. Then implement a function which gets the user list from the server
         # and prints the list of usernames
-        "function": None
+        "function": get_users
     },
     {
         "description": "Get a joke",
