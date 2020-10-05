@@ -1,7 +1,7 @@
 #################################################################################
 # A Chat Client application. Used in the course IELEx2001 Computer networks, NTNU
 #################################################################################
-
+import threading
 from socket import *
 
 # --------------------
@@ -15,7 +15,8 @@ states = [
 ]
 TCP_PORT = 1300  # TCP port used for communication
 SERVER_HOST = "datakomm.work"  # Set this to either hostname (domain) or IP address of the chat server
-SYNC_MODE = True   # Set this yo true to use synchronous mode
+SYNC_MODE = False   # Set this to true to use synchronous mode
+EXTERNAL_VIEWER = True  # Can not be used along with synchronous mode
 
 # --------------------
 # State variables
@@ -26,13 +27,86 @@ must_run = True
 # Use this variable to create socket connection to the chat server
 # Note: the "type: socket" is a hint to PyCharm about the type of values we will assign to the variable
 client_socket = None  # type: socket
+terminal_socket = None  # type: socket
+terminal_socket = None  # type: socket
 
+def send_to_terminal():
+    global terminal_socket
+    global must_run
+    terminal_socket = socket(AF_INET, SOCK_STREAM)
+    terminal_socket.connect(("localhost", 8001))
+    terminal_socket.send("Connected".encode())
+    while must_run:
+        terminal_socket.send("while".encode())
+        pass
+
+def update_users():
+    global must_run
+    user_socket = socket(AF_INET, SOCK_STREAM)
+    user_socket.connect(("localhost", 8002))
+    user_socket.send("Connected".encode())
+
+    while must_run:
+        user_socket.send("while".encode())
+
+    pass
+
+def continuous_server_response():
+    global must_run
+    global client_socket
+    global current_state
+
+    try:
+        while must_run and current_state != "disconnected":
+            print("fff")
+            server_response = get_servers_response()
+            if server_response == "loginok":
+                # TODO: Add logged in as: ...
+                print("Login successful")
+            else:
+                print(server_response)
+                command, message = server_response.split(maxsplit=1)
+                print(command,message)
+                if "msgok" in command:
+                    # TODO get the last message sent
+                    # TODO: print the correct message...
+                    print("You: ", message)
+                elif "msg" in command:
+                    username, message = message.split(maxsplit=1)
+                    if "privmsg" in command:
+                        print(username, "to you:", message)
+                    else:
+                        print(username, "to all:", message)
+
+                elif "modeok" in command:
+                    #TODO: return mode ok to selector in connection
+                    print("ERROR: mode not switched")
+
+                elif "loginerr" in command:
+                    #TODO send an error to terminal 1
+                    print(message)
+
+                elif "users" in command:
+                    all_users = message.split()
+                    all_users = all_users[0:]
+                    print("The following users are online: ")
+                    for user in all_users:
+                        #TODO: send to terminal 2
+                        print(user)
+
+                elif "joke" in command:
+                    print(message)
+
+    except ConnectionAbortedError:
+        pass
 
 def quit_application():
     """ Update the application state so that the main-loop will exit """
     # Make sure we reference the global variable here. Not the best code style,
     # but the easiest to work with without involving object-oriented code
     global must_run
+    global EXTERNAL_VIEWER
+
     must_run = False
 
 
@@ -102,6 +176,9 @@ def connect_to_server():
     # Must have these two lines, otherwise the function will not "see" the global variables that we will change here
     global client_socket
     global current_state
+    global terminal_socket
+    global EXTERNAL_VIEWER
+
 
     # Creates a socket and connects to the sever, prints an error message if it occurs an IO-error.
     try:
@@ -118,16 +195,28 @@ def connect_to_server():
         current_state = "connected"
         if SYNC_MODE:   # The Server is running async by default
             send_command('sync', None)
-            response = get_servers_response()
-            if response != "modeok":
-                print("ERROR: mode not switched")
-            else:
-                print("Running in synchronous mode")
+            if not EXTERNAL_VIEWER:
+                response = get_servers_response()
+                if response != "modeok":
+                    print("ERROR: mode not switched")
+                else:
+                    print("Running in synchronous mode")
         else:
             # Uncomment the lines below to have the possibility activate sync mode.
             # send_command('async', None)
             # response = get_servers_response()
             pass
+
+    if EXTERNAL_VIEWER:
+
+        server_thread = threading.Thread(name="server_thread", target=continuous_server_response, args=())
+        messages_thread = threading.Thread(name="messages_thread", target=send_to_terminal, args=())
+        users_thread = threading.Thread(name="users_thread", target=update_users, args=())
+
+        server_thread.start()
+        messages_thread.start()
+        users_thread.start()
+    pass
 
 
 def disconnect_from_server():
@@ -138,6 +227,7 @@ def disconnect_from_server():
     # Must have these two lines, otherwise the function will not "see" the global variables that we will change here
     global client_socket
     global current_state
+    global EXTERNAL_VIEWER
 
     # Close the socket and print the error if one occur
     try:
@@ -167,16 +257,17 @@ def authorize():
     :return:
     """
     global current_state
+    global EXTERNAL_VIEWER
 
     username = input('Enter username: ')
     command = "login"
     send_command(command, username)
-    response = get_servers_response()
-
-    if "loginerr" in response:
-        print(response)
-    else:
-        current_state = "authorized"
+    if not EXTERNAL_VIEWER:
+        response = get_servers_response()
+        if "loginerr" in response:
+            print(response)
+        else:
+            current_state = "authorized"
     pass
 
 
@@ -185,14 +276,18 @@ def send_public_message():
     Sends a public message to the server.
     :return:
     """
+    global EXTERNAL_VIEWER
+
     command = "msg"
     message = input("Message: ")
     send_command(command, message)
-    response = get_servers_response()
-    if "msgok" in response:
-        print("You: ", message)
-    else:
-        print(response)
+
+    if not EXTERNAL_VIEWER:
+        response = get_servers_response()
+        if "msgok" in response:
+            print("You: ", message)
+        else:
+            print(response)
     pass
 
 
@@ -201,16 +296,19 @@ def send_private_message():
     Sends a private message to a user.
     :return:
     """
+    global EXTERNAL_VIEWER
+
     command = "privmsg"
     username = input("To: ")    # The users specify the user to receive the message
     message = username + " " + input("Message: ")   # The users specify the message to send
     send_command(command, message)
-    response = get_servers_response()
 
-    if "msgok" in response:
-        print("You to ", username, ": ", message)
-    else:
-        print(response)
+    if not EXTERNAL_VIEWER:
+        response = get_servers_response()
+        if "msgok" in response:
+            print("You to ", username, ": ", message)
+        else:
+            print(response)
     pass
 
 
@@ -219,14 +317,17 @@ def get_users():
     Get the list of users from the server, and prints all the users in the console.
     :return:
     """
+    global EXTERNAL_VIEWER
+
     send_command("users", None)
-    response = get_servers_response()
-    if "users" in response:
-        all_users = response.split()
-        all_users = all_users[1:]
-        print("The following users are online: ")
-        for user in all_users:
-            print(user)
+    if not EXTERNAL_VIEWER:
+        response = get_servers_response()
+        if "users" in response:
+            all_users = response.split()
+            all_users = all_users[1:]
+            print("The following users are online: ")
+            for user in all_users:
+                print(user)
     pass
 
 
@@ -237,17 +338,18 @@ def get_inbox():
     """
     send_command("inbox", None)
     # The first response contains "inbox #" there # is the number of messages in the inbox
-    first_line = get_servers_response().split(maxsplit=1)
-    if "inbox" in first_line:
+    if not EXTERNAL_VIEWER:
+        first_line = get_servers_response().split(maxsplit=1)
+        if "inbox" in first_line:
 
-        for i in range(int(first_line[1])):
-            message_type, username, message = get_servers_response().split(maxsplit=2)
+            for i in range(int(first_line[1])):
+                message_type, username, message = get_servers_response().split(maxsplit=2)
 
-            if message_type == "privmsg":
-                print(username, "to you:", message)
+                if message_type == "privmsg":
+                    print(username, "to you:", message)
 
-            else:
-                print(username, "to all:", message)
+                else:
+                    print(username, "to all:", message)
     pass
 
 
@@ -256,11 +358,13 @@ def get_joke():
     Asks the server for a joke to print.
     :return:
     """
+    global EXTERNAL_VIEWER
+
     send_command("joke", None)
     command, joke = get_servers_response().split(maxsplit=1)
-
-    if command == "joke":
-        print(joke)
+    if not EXTERNAL_VIEWER:
+        if command == "joke":
+            print(joke)
     pass
 
 
@@ -403,6 +507,7 @@ def perform_user_action(action_index):
         print("Invalid input, please choose a valid action")
     print()
     return None
+
 
 
 # Entrypoint for the application. In PyCharm you should see a green arrow on the left side.
