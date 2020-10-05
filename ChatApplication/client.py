@@ -45,17 +45,16 @@ def send_command(command, arguments):
     :return:
     """
     global client_socket
-    # Hint: concatenate the command and the arguments
-    # Hint: remember to send the newline at the end
 
-    # TODO FINAL: Add comments to this function?
+    # There are some commands that dont have any arguments
     message_to_send = command
     if arguments is not None:
         message_to_send += " "
         message_to_send += arguments
 
-    message_to_send += '\n'
+    message_to_send += "\n"     # the "\n" character is used as the end of the statement.
     message_encoded = message_to_send.encode()
+    # send the encoded message to the server
     client_socket.send(message_encoded)
     pass
 
@@ -95,13 +94,16 @@ def get_servers_response():
 
 
 def connect_to_server():
-    # TODO FINAL: Clean up function
+    """
+    Connects the program to the chat-server specified in the constants at the top
+    Also switches the mode of the connection to synchronous mode if SYNC_MODE constant is set
+    :return
+    """
     # Must have these two lines, otherwise the function will not "see" the global variables that we will change here
     global client_socket
     global current_state
 
-    # Hint: create a socket, connect, handle exceptions, then change current_state accordingly
-
+    # Creates a socket and connects to the sever, prints an error message if it occurs an IO-error.
     try:
         client_socket = socket(AF_INET, SOCK_STREAM)
         client_socket.connect((SERVER_HOST, TCP_PORT))
@@ -111,6 +113,7 @@ def connect_to_server():
         print('ERROR Connecting to server: ', e)
         connection_established = False
 
+    # Switch to the desired running mode of the communication
     if connection_established:
         current_state = "connected"
         if SYNC_MODE:   # The Server is running async by default
@@ -120,26 +123,23 @@ def connect_to_server():
                 print("ERROR: mode not switched")
             else:
                 print("Running in synchronous mode")
-
-    # Hint: send the sync command according to the protocol
-    # Hint: create function send_command(command, arguments) which you will use to send this and all other commands
-    # to the server
-
-    # Hint: implement the get_servers_response function first - it should wait for one response command from the server
-    # and return the server's response (we expect "modeok" response here). This get_servers_response() function
-    # will come in handy later as well - when we will want to check the server's response to login, messages etc
-
-    # print("CONNECTION NOT IMPLEMENTED!")
+        else:
+            # Uncomment the lines below to have the possibility activate sync mode.
+            # send_command('async', None)
+            # response = get_servers_response()
+            pass
 
 
 def disconnect_from_server():
-    # TODO FINAL: Clean up function and refactor code
-    # Hint: close the socket, handle exceptions, update current_state accordingly
-
+    """
+    Disconnect from the server and change the status if done successfully.
+    :return:
+    """
     # Must have these two lines, otherwise the function will not "see" the global variables that we will change here
     global client_socket
     global current_state
 
+    # Close the socket and print the error if one occur
     try:
         client_socket.close()
         client_closed = True
@@ -160,20 +160,19 @@ def disconnect_from_server():
 
 
 def authorize():
-    # Hint: you will probably want to create a new function (call it login(), or authorize()) and
-    # reference that function here.
-    # Hint: you can ask the user to enter the username with input("Enter username: ") function.
-    # Hint: the login function must be above this line, otherwise the available_actions will complain that it can't
-    # find the function
-    # Hint: you can reuse the send_command() function to send the "login" command
-    # Hint: you probably want to change the state of the system: update value of current_state variable
-    # Hint: remember to tell the function that you will want to use the global variable "current_state".
-    # Hint: if the login was unsuccessful (loginerr returned), show the error message to the user
+    """
+    Allows the user to authorize (login) to the server with a given username,
+    and changes the sate of the system to "authorized" if authorization is successful.
+    Prints the error message returned from the server, if there is one
+    :return:
+    """
     global current_state
+
     username = input('Enter username: ')
     command = "login"
     send_command(command, username)
     response = get_servers_response()
+
     if "loginerr" in response:
         print(response)
     else:
@@ -182,6 +181,10 @@ def authorize():
 
 
 def send_public_message():
+    """
+    Sends a public message to the server.
+    :return:
+    """
     command = "msg"
     message = input("Message: ")
     send_command(command, message)
@@ -194,11 +197,16 @@ def send_public_message():
 
 
 def send_private_message():
+    """
+    Sends a private message to a user.
+    :return:
+    """
     command = "privmsg"
-    username = input("To: ")
-    message = username + " " + input("Message: ")
+    username = input("To: ")    # The users specify the user to receive the message
+    message = username + " " + input("Message: ")   # The users specify the message to send
     send_command(command, message)
     response = get_servers_response()
+
     if "msgok" in response:
         print("You to ", username, ": ", message)
     else:
@@ -207,6 +215,10 @@ def send_private_message():
 
 
 def get_users():
+    """
+    Get the list of users from the server, and prints all the users in the console.
+    :return:
+    """
     send_command("users", None)
     response = get_servers_response()
     if "users" in response:
@@ -219,8 +231,13 @@ def get_users():
 
 
 def get_inbox():
+    """
+   Get all the messages from the server. And prints them in order.
+   :return:
+    """
     send_command("inbox", None)
-    first_line = get_servers_response().split()
+    # The first response contains "inbox #" there # is the number of messages in the inbox
+    first_line = get_servers_response().split(maxsplit=1)
     if "inbox" in first_line:
 
         for i in range(int(first_line[1])):
@@ -228,14 +245,20 @@ def get_inbox():
 
             if message_type == "privmsg":
                 print(username, "to you:", message)
+
             else:
                 print(username, "to all:", message)
     pass
 
 
 def get_joke():
+    """
+    Asks the server for a joke to print.
+    :return:
+    """
     send_command("joke", None)
     command, joke = get_servers_response().split(maxsplit=1)
+
     if command == "joke":
         print(joke)
     pass
@@ -284,7 +307,6 @@ available_actions = [
     {
         "description": "Read messages in the inbox",
         "valid_states": ["connected", "authorized"],
-        # TODO Step 9 - implement reading messages from the inbox.
         # Hint: send the inbox command, find out how many messages there are. Then parse messages
         # one by one: find if it is a private or public message, who is the sender. Print this
         # information in a user friendly way
@@ -301,7 +323,6 @@ available_actions = [
     {
         "description": "Get a joke",
         "valid_states": ["connected", "authorized"],
-        # TODO - optional step - implement the joke fetching from the server.
         # Hint: this part is not described in the protocol. But the command is simple. Try to find
         # out how it works ;)
         "function": get_joke
