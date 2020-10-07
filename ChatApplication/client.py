@@ -2,6 +2,7 @@
 # A Chat Client application. Used in the course IELEx2001 Computer networks, NTNU
 #################################################################################
 import threading
+import time
 from socket import *
 
 # --------------------
@@ -28,77 +29,113 @@ must_run = True
 # Note: the "type: socket" is a hint to PyCharm about the type of values we will assign to the variable
 client_socket = None  # type: socket
 terminal_socket = None  # type: socket
-terminal_socket = None  # type: socket
+user_socket = None  # type: socket
+
+server_thread = None # type: threading.Thread
+messages_thread = None  # type: threading.Thread
+users_thread = None  # type: threading.Thread
+
+message_to_terminal = []
+message_from_server = []
+user_message = []
+message_sent = []
+
 
 def send_to_terminal():
     global terminal_socket
     global must_run
+    global message_to_terminal
+
     terminal_socket = socket(AF_INET, SOCK_STREAM)
     terminal_socket.connect(("localhost", 8001))
-    terminal_socket.send("Connected".encode())
+    terminal_socket.send("Connected\n".encode())
+
     while must_run:
-        terminal_socket.send("while".encode())
+        # Array not empty
+        if len(message_to_terminal) != 0:
+            # print first meassage in array
+            message = message_to_terminal[0].__str__() + "\n"
+            terminal_socket.send(message.encode())
+            message_to_terminal.pop(0)
+
+            #terminal_socket.send("while".encode())
+        else:
+            time.sleep(0.5)
         pass
 
 def update_users():
     global must_run
+    global user_socket
+
     user_socket = socket(AF_INET, SOCK_STREAM)
     user_socket.connect(("localhost", 8002))
-    user_socket.send("Connected".encode())
+    user_socket.send("Connected\n".encode())
 
     while must_run:
-        user_socket.send("while".encode())
-
+    # user_socket.send("while".encode())
+        time.sleep(1)
+        pass
     pass
 
 def continuous_server_response():
     global must_run
     global client_socket
     global current_state
+    global message_to_terminal
+    global message_sent
 
     try:
         while must_run and current_state != "disconnected":
-            print("fff")
+            #print("fff")
             server_response = get_servers_response()
             if server_response == "loginok":
                 # TODO: Add logged in as: ...
-                print("Login successful")
+                message_to_terminal.append("Login successful")
             else:
-                print(server_response)
+                #print(server_response)
                 command, message = server_response.split(maxsplit=1)
-                print(command,message)
+                #print(command,message)
                 if "msgok" in command:
                     # TODO get the last message sent
                     # TODO: print the correct message...
-                    print("You: ", message)
+
+                    message = "You: " + message_sent[0]
+                    message_to_terminal.append(message)
+                    message_sent.pop(0)
+
                 elif "msg" in command:
                     username, message = message.split(maxsplit=1)
                     if "privmsg" in command:
-                        print(username, "to you:", message)
+                        message = username + " to you: " + message
+                        message_to_terminal.append(message)
                     else:
-                        print(username, "to all:", message)
+                        message = username + " to all: " + message
+                        message_to_terminal.append(message)
 
                 elif "modeok" in command:
                     #TODO: return mode ok to selector in connection
-                    print("ERROR: mode not switched")
+                    message_to_terminal.append("ERROR: mode not switched")
 
                 elif "loginerr" in command:
                     #TODO send an error to terminal 1
-                    print(message)
+                    message_to_terminal.append(message)
 
                 elif "users" in command:
                     all_users = message.split()
                     all_users = all_users[0:]
-                    print("The following users are online: ")
-                    for user in all_users:
-                        #TODO: send to terminal 2
-                        print(user)
+                    user_message = all_users
+
+                    # print("The following users are online: ")
+                    # for user in all_users:
+                    #     #TODO: send to terminal 2
+                    #     print(user)
 
                 elif "joke" in command:
                     print(message)
 
     except ConnectionAbortedError:
         pass
+
 
 def quit_application():
     """ Update the application state so that the main-loop will exit """
@@ -108,6 +145,7 @@ def quit_application():
     global EXTERNAL_VIEWER
 
     must_run = False
+
 
 
 def send_command(command, arguments):
@@ -178,7 +216,10 @@ def connect_to_server():
     global current_state
     global terminal_socket
     global EXTERNAL_VIEWER
-
+    global SYNC_MODE
+    global server_thread
+    global messages_thread
+    global users_thread
 
     # Creates a socket and connects to the sever, prints an error message if it occurs an IO-error.
     try:
@@ -277,10 +318,12 @@ def send_public_message():
     :return:
     """
     global EXTERNAL_VIEWER
+    global message_sent
 
     command = "msg"
     message = input("Message: ")
     send_command(command, message)
+    message_sent.append(message)
 
     if not EXTERNAL_VIEWER:
         response = get_servers_response()
@@ -297,6 +340,7 @@ def send_private_message():
     :return:
     """
     global EXTERNAL_VIEWER
+    global message_was_sent
 
     command = "privmsg"
     username = input("To: ")    # The users specify the user to receive the message
