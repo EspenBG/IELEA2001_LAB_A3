@@ -112,6 +112,10 @@ def continuous_server_response():
                         message = username + " to all: " + message
                         message_to_terminal.append(message)
 
+
+                    pass
+                pass
+
                 elif "modeok" in command:
                     #TODO: return mode ok to selector in connection
                     message_to_terminal.append("ERROR: mode not switched")
